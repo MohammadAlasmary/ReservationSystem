@@ -1,0 +1,832 @@
+package sem451;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
+
+public interface DataTasks {
+	public void saveDataToFile()throws FileNotFoundException,IOException,Exception;
+	public void loadDataFromFile() throws FileNotFoundException,IOException,Exception;
+
+}
+ 8 changes: 8 additions & 0 deletions8  
+Room Reservation/src/sem451/FileNames.java
+@@ -0,0 +1,8 @@
+package sem451;
+
+public interface FileNames {
+
+	final static String SESSIONS_FILE = "sessions.data";
+	final static String PRINT_FILE = "printedData.txt";
+	final static String PEOPLE_FILE = "people.data";
+}
+ 335 changes: 335 additions & 0 deletions335  
+Room Reservation/src/sem451/KkuSystem.java
+@@ -0,0 +1,335 @@
+package sem451;
+import java.util.*;
+import java.time.*;
+import java.io.*;
+import java.text.SimpleDateFormat;
+
+public class KkuSystem implements FileNames, ReserveTasks{
+
+
+	static List<ReserveBlock> reservations = new ArrayList<>();
+	static People people = new People();
+
+
+	public void showCLIMenu() {
+
+		load(); //load previous data
+		Person p; LocalDate l; int t; Room r; boolean st; Scanner sc = new Scanner(System.in); String s;
+		String timeStamp = new SimpleDateFormat("yyyy-MM-dd | HH:mm:ss").format(Calendar.getInstance().getTime());
+		while(true) {
+			System.out.println("\n\n\nWelcome to KKU LAB Managament System");
+			System.out.println(timeStamp);
+			System.out.println("=================================================");
+			System.out.println("1. Make a reservation + New User");
+			System.out.println("2. Update a reservation");
+			System.out.println("3. Print all reservations on screen");
+			System.out.println("4. Print reservations to File");
+			System.out.println("5. Exit");
+			System.out.println("6. Remove Reservation");
+			System.out.println("7. Create New User");
+			System.out.println("8. Print all users on screen");
+			System.out.println("9. Remove User");
+			System.out.print("\nPlease Enter a number:");
+			s = sc.next();
+			switch(s) {
+			case "1":
+				System.out.println("Enter person name, id, age (press Enter after each):");
+				p = new Person(sc.next(),sc.next(),sc.nextInt());
+				people.addPerson(p);
+				System.out.println("Enter room name:");
+				r = new LabRoom(sc.next());
+				System.out.println("Enter Date in yyyy-mm-dd:");
+				l=LocalDate.parse(sc.next());
+				System.out.println("At what Clock 1-24 (Only 1 hour can be booked)?");
+				t=sc.nextInt();
+				st=this.reserveBlock(new ReserveBlock(p,l,t,r));
+				break;
+
+
+			case "2":
+				System.out.println("Not working. Please remove and Add again.");
+				break;
+
+
+			case "3":
+				this.printReservedBlocks(reservations);
+				break;
+
+
+			case "4":
+				this.exportToFile2();
+				break;
+
+
+			case "5":
+				sc.close();
+				System.out.println("Saving...");
+				save();
+				System.out.println("Thank you.");
+				System.exit(0);
+
+			case "6":
+				p = new Person("test","test",0);
+				System.out.println("Enter room name:");
+				r = new LabRoom(sc.next());
+				System.out.println("Enter Date in yyyy-mm-dd:");
+				l=LocalDate.parse(sc.next());
+				System.out.println("At what Clock 1-24 (Only 1 hour can be booked)?");
+				t=sc.nextInt();
+				st=this.removeBlock(new ReserveBlock(null,l,t,r));
+				break;
+
+			case "7":
+				System.out.println("Enter person name, id, age (press Enter after each):");
+				people.addPerson(sc.next(), sc.next(), sc.nextInt());
+				break;
+
+			case "8":
+				people.printPeople();
+				break;
+
+			case "9":
+				System.out.println("Enter user id to remove:");
+				people.removePerson(sc.next());
+				break;
+
+			default:
+				System.err.println("Wrong choice!\n");
+
+			}
+		}
+
+	}
+	public static void main(String args[]) {
+		reservations.add(new ReserveBlock(new Person("Ahmad","0",0),LocalDate.parse("2023-12-12"),12,new LabRoom("18S")));
+		//String s = sc.next();
+		//LocalDate l = LocalDate.parse(s);
+		//LocalTime t = LocalTime.parse(s);
+		//System.out.println(t);
+		new KkuSystem().showCLIMenu();
+	}
+
+	@Override
+	/**
+	  * Check person is not blocked
+	  *	Check block's date, time, & room is not in the list
+	  * then add it
+	  **/
+	public boolean reserveBlock(ReserveBlock rb) {
+		if(this.checkExist(rb, reservations))
+		{
+			System.out.println("Sorry, booked in "+rb.getDate()+" at "+rb.getClock()+"!");
+			return false;
+		}
+		else
+		{
+			reservations.add(rb);
+			System.out.println("Done, Room "+rb.getRoom().getName()+" booked in "+rb.getDate()+" at "+rb.getClock()+".");
+			return false;
+		}
+	}
+
+	/**
+	 * Search all list elements if there is any blocked rooms
+	 * similar to the parameter return true.
+	 * @param rb block you want to add
+	 * @param rooms list of blocked rooms
+	 * @return true if it finds a match in the list
+	 */
+	public boolean checkExist(ReserveBlock rb, List<ReserveBlock> rooms) {
+		for(ReserveBlock room: rooms) {
+			if(room.equals(rb))
+				return true;
+		}
+		return false;
+	}
+
+	@Override
+	public boolean updateBlock(ReserveBlock rb) {
+		if(rb.getBy().isBlocked())
+		{
+			System.out.println("User cannot make a reservation!");
+			return false;
+		}
+		else if(!this.checkExist(rb, reservations))
+		{
+			System.out.println("Sorry, no one has booked it in "+rb.getDate()+" at "+rb.getClock()+"!");
+			System.out.println("Making a new reservation ...");
+			return reserveBlock(rb);
+		}
+		else
+		{
+			removeBlock(rb);
+			if(reserveBlock(rb))
+			{
+				System.out.println("Updated.");
+				return true;
+			}
+
+			else 
+			{
+				System.out.println("Failed to update!");
+				return false;
+			}
+		}
+	}
+
+	@Override
+	public boolean removeBlock(ReserveBlock rb) {
+		int in = -1;
+		if(reservations.isEmpty()) {
+			System.out.println("List is Empty!");
+			return false;
+		}
+		for(int i =0; i<reservations.size();i++)
+				{
+					if(rb.getDate().equals(reservations.get(i).getDate()))
+					{
+						if(rb.getClock()==reservations.get(i).getClock()) 
+						{
+							if(rb.getRoom().getName().equalsIgnoreCase(reservations.get(i).getRoom().getName()))
+							{
+								in = i;
+								break;
+							}
+						}
+					}
+				}
+		if(in!=-1)
+			{
+				System.out.println("Removed "+reservations.get(in));
+				reservations.remove(in);
+				return true;
+			}
+		System.out.println("Sorry, could not find the block to remove!");
+		return false;
+	}
+
+	@Override
+	public void removeAllEndedBlocks() {
+		// TODO Auto-generated method stub
+
+	}
+
+	@Override
+	public void printReservedBlocks(List<ReserveBlock> blocks) {
+		if(blocks.isEmpty())
+			System.out.println("No reservations have been made!");
+		else
+			for(ReserveBlock block:blocks) {
+				System.out.println(block);
+			}
+
+	}
+
+	@Override
+	public boolean loadDataFromFile() {
+		reservations.clear();
+		ObjectInputStream o;
+			try {
+				o = new ObjectInputStream(new FileInputStream(SESSIONS_FILE));
+				reservations=(List<ReserveBlock>) o.readObject();
+				System.out.println("Finished Loading data.");
+				System.out.println(reservations.size()+" session(s) imported.");
+				o.close();
+				return true;
+			} catch (FileNotFoundException e) {
+				System.out.println("File Not Found to load!");
+			} catch (IOException e) {
+				System.out.println("Could not load from file!");
+				e.printStackTrace();
+			} catch(Exception e) {
+				System.out.println("Unknow error in load file!");
+				e.printStackTrace();
+			}
+		return false;
+	}
+
+	@Override
+	public boolean saveDataToFile() {
+		if(KkuSystem.reservations.isEmpty())
+		{
+			System.out.println("Nothing to save!");
+			return true;
+		}
+		else {
+			ObjectOutputStream o,o2;
+			try {
+				o = new ObjectOutputStream(new FileOutputStream(SESSIONS_FILE));
+				o.writeObject(reservations);
+				o.close();
+
+				o2 = new ObjectOutputStream(new FileOutputStream(PEOPLE_FILE));
+				o2.writeObject(people);
+				o2.close();
+				return true;
+			} catch (FileNotFoundException e) {
+				System.out.println("File Not Found to save!");
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		return false;
+	}
+
+	//export data to text file
+	//it uses PrintWriter and always override!
+	public boolean exportToFile2() {
+		if(KkuSystem.reservations.isEmpty())
+		{
+			System.out.println("Nothing to export!");
+			return true;
+		}
+		else {
+			try {
+				PrintWriter o = new PrintWriter(PRINT_FILE);
+				String timeStamp = new SimpleDateFormat("yyyy-MM-dd | HH:mm:ss").format(Calendar.getInstance().getTime());
+				o.println("\n================="+timeStamp+"==================");
+				for(ReserveBlock bl: reservations)
+				{
+					o.println(bl);
+				}
+				o.close();
+				System.out.println("Finished exporting.");
+				return true;
+			} catch (FileNotFoundException e) {
+				System.out.println("FileNot Found to export!");
+				e.printStackTrace();
+			}
+		}
+		return false;
+	}
+
+
+	//this method save users and sessions into external file
+	public void save() {
+		try {
+			this.saveDataToFile();
+			people.saveDataToFile();
+
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+
+	//this method load users and sessions from external file to their collections
+	public void load() {
+		try {
+			this.loadDataFromFile();
+			people.loadDataFromFile();
+
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+}
+ 70 changes: 70 additions & 0 deletions70  
+Room Reservation/src/sem451/LabRoom.java
+@@ -0,0 +1,70 @@
+package sem451;
+
+public class LabRoom extends Room {
+
+	private int numberOfPc;
+	private boolean vdi;
+	private boolean store;
+	private boolean dataShow;
+	private String note;
+
+
+	public LabRoom(String n) {
+		this(n,0,false);
+	}
+
+	public LabRoom(String n, int pcs, boolean vdi) {
+		super(n);
+		this.setNumberOfPc(pcs);
+		this.setVdi(vdi);
+	}
+
+
+
+	public String getNote() {
+		return note;
+	}
+
+	public void addNote(String note) {
+		this.note += note;
+	}
+
+	public void clearNote() {
+		note="";
+	}
+
+
+	public int getNumberOfPc() {
+		return numberOfPc;
+	}
+
+	public void setNumberOfPc(int numberOfPc) {
+		this.numberOfPc = numberOfPc;
+	}
+
+	public boolean isVdi() {
+		return vdi;
+	}
+
+	public void setVdi(boolean vdi) {
+		this.vdi = vdi;
+	}
+
+	public boolean isStore() {
+		return store;
+	}
+
+	public void setStore(boolean store) {
+		this.store = store;
+	}
+
+	public boolean isDataShow() {
+		return dataShow;
+	}
+
+	public void setDataShow(boolean dataShow) {
+		this.dataShow = dataShow;
+	}
+
+
+}
+ 17 changes: 17 additions & 0 deletions17  
+Room Reservation/src/sem451/OptionalReserveTasks.java
+@@ -0,0 +1,17 @@
+package sem451;
+
+import java.time.LocalDate;
+import java.util.List;
+
+public interface OptionalReserveTasks {
+
+	List<ReserveBlock> findReservedBlocksBy(Person p);
+	List<Person> findPeopleReservedBlock(ReserveBlock rb);
+
+	List<Integer> findHoursForReservedBlock(ReserveBlock rb, LocalDate date);
+	List<LocalDate> findDatesForReservedBlock(ReserveBlock rb);
+
+	List<ReserveBlock> findReservedBlockAt(int clock);
+	List<ReserveBlock> findReservedBlockAt(LocalDate date);
+	List<ReserveBlock> findReservedBlockAt(LocalDate date, int clock);
+}
+ 92 changes: 92 additions & 0 deletions92  
+Room Reservation/src/sem451/People.java
+@@ -0,0 +1,92 @@
+package sem451;
+
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class People implements FileNames, DataTasks{
+
+	private Map<String, Person> people;
+	public People() {
+		people = new HashMap<>();
+	}
+
+	public int howManyPeople() {
+		return people.size();
+	}
+	public void clearAllPeople() {
+		people.clear();
+	}
+	public void printPeople() {
+		for (Map.Entry<String, Person> e : people.entrySet()) 
+		{
+		      System.out.println(e.getValue());
+		}
+	}
+
+	public boolean addPerson(Person p) {
+		return addPerson(p.name(),p.getId(),p.getAge());
+	}
+
+	public boolean addPerson(String name, String id, int age) {
+		if(people.containsKey(id)) 
+		{
+			System.out.println("Sorry, id is used! User cannot be created.");
+			return false;
+		}
+		people.put(id, new Person(name,id,age));
+		System.out.println(name+" has been added.");
+		System.out.println("No. of users is: "+people.size());
+		return true;
+	}
+
+	public boolean removePerson(String id) {
+		Person p = people.remove(id);
+		if(p==null) {
+			System.out.println("Sorry, no such a user!");
+			return false;
+		}
+		System.out.println(p.name()+" has been removed.");
+		System.out.println("No. of users is: "+people.size());
+		return true;
+	}
+
+
+	public Person getPersonById(String id) {
+		Person p = people.get(id);
+		if(p==null) {
+			System.out.println("Sorry, no such a user!");
+			return null;
+		}
+		return p;
+	}
+
+
+	public void loadDataFromFile() throws FileNotFoundException, IOException, Exception{
+		people.clear();
+		ObjectInputStream o;
+		o = new ObjectInputStream(new FileInputStream(PEOPLE_FILE));
+		o.close();
+		people=(Map<String,Person>) o.readObject();
+		System.out.println("Finished Loading people data.");
+		System.out.println(people.size()+" user(s) imported.");
+	}
+
+	@Override
+	public void saveDataToFile()  throws FileNotFoundException, IOException, Exception{
+		if(people.isEmpty()) System.out.println("No users to save!");
+		else 
+		{
+			ObjectOutputStream o;			
+			o = new ObjectOutputStream(new FileOutputStream(PEOPLE_FILE));
+			o.writeObject(people);
+			o.close(); 
+		}
+	}
+}
+ 49 changes: 49 additions & 0 deletions49  
+Room Reservation/src/sem451/Person.java
+@@ -0,0 +1,49 @@
+package sem451;
+
+import java.io.Serializable;
+
+public class Person  implements Serializable{
+	String name;
+	String id;
+	int age;
+	boolean blocked;
+
+	public Person(String name, String id, int age) {
+		this.setId(id);
+		this.rename(name);
+		this.setAge(age);
+		this.setBlocked(false);
+	}
+	@Override
+	public String toString() {
+	return "Person [" + name + "-" + id + "]";
+	}
+	public String name() {
+	return name;
+	}
+	public void rename(String name) {
+	if(name == null || name.isEmpty())
+	name = "na";
+	this.name = name;
+	}
+	public String getId() {
+	return id;
+	}
+	public void setId(String id) {
+	this.id = id;
+	}
+	public int getAge() {
+	return age;
+	}
+	public void setAge(int age) {
+	this.age = age;
+	}
+	public boolean isBlocked() {
+	return blocked;
+	}
+	public void setBlocked(boolean blocked) {
+	this.blocked = blocked;
+	}
+
+
+}
+ 69 changes: 69 additions & 0 deletions69  
+Room Reservation/src/sem451/ReserveBlock.java
+@@ -0,0 +1,69 @@
+package sem451;
+
+import java.io.Serializable;
+import java.time.LocalDate;
+
+public class ReserveBlock implements Serializable{
+		Person by;
+		LocalDate d;
+		int clock;
+		Room room;
+
+	public ReserveBlock(Person p, LocalDate d, int t, Room r){
+		by=p; this.d=d; clock=t; room=r;
+	}
+
+
+	public boolean equals(ReserveBlock br) {
+		if(br.getClock()==this.getClock() && br.getDate()==this.getDate() && br.getRoom()==this.getRoom())
+			return true;
+		return false;		
+	}
+	@Override
+	public String toString() {
+		return "Session ["+room.name+", "+d + ", at " + clock + ", by " + by + "]";
+	}
+
+
+	public Person getBy() {
+		return by;
+	}
+
+
+	public void setBy(Person by) {
+		this.by = by;
+	}
+
+
+	public LocalDate getDate() {
+		return d;
+	}
+
+
+	public void setDate(LocalDate d) {
+		this.d = d;
+	}
+
+
+	public int getClock() {
+		return clock;
+	}
+
+
+	public void setClock(int clock) {
+		this.clock = clock;
+	}
+
+
+	public Room getRoom() {
+		return room;
+	}
+
+
+	public void setRoom(Room room) {
+		this.room = room;
+	}
+
+
+}
+
+ 16 changes: 16 additions & 0 deletions16  
+Room Reservation/src/sem451/ReserveTasks.java
+@@ -0,0 +1,16 @@
+package sem451;
+
+import java.util.List;
+
+public interface ReserveTasks {
+	boolean reserveBlock(ReserveBlock rb);
+	boolean updateBlock(ReserveBlock rb);
+	boolean removeBlock(ReserveBlock rb);
+
+	void removeAllEndedBlocks();
+	void printReservedBlocks(List<ReserveBlock> blocks);
+
+	boolean loadDataFromFile();
+	boolean saveDataToFile();
+
+}
+ 98 changes: 98 additions & 0 deletions98  
+Room Reservation/src/sem451/Room.java
+@@ -0,0 +1,98 @@
+package sem451;
+
+import java.io.Serializable;
+
+public abstract class Room  implements Serializable{
+
+	/**
+	 * 
+	 */
+	protected String name;
+	protected String location;
+	protected float length;
+	protected float width;
+	protected boolean window;
+	protected boolean secDoor;
+
+	public Room(String n) {
+		this.setName(n);
+	}
+
+
+
+
+	public boolean hasWindow() {
+		return window;
+	}
+
+
+
+
+	public void setWindow(boolean window) {
+		this.window = window;
+	}
+
+
+
+
+	public boolean hasSecDoor() {
+		return secDoor;
+	}
+
+
+
+
+	public void setSecDoor(boolean secDoor) {
+		this.secDoor = secDoor;
+	}
+
+
+
+
+	@Override
+	public String toString() {
+		return "Room [name=" + name + ", location=" + location + ", length=" + length + ", width=" + width + "]";
+	}
+
+	public float getArea() {
+		return width*length;
+	}
+
+
+
+
+
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	public String getLocation() {
+		return location;
+	}
+
+	public void setLocation(String location) {
+		this.location = location;
+	}
+
+	public float getLength() {
+		return length;
+	}
+
+	public void setLength(float length) {
+		this.length = length;
+	}
+
+	public float getWidth() {
+		return width;
+	}
+
+	public void setWidth(float width) {
+		this.width = width;
+	}
+
+
+}
+ 38 changes: 38 additions & 0 deletions38  
+Room Reservation/src/sem451/Student.java
+@@ -0,0 +1,38 @@
+package sem451;
+
+public class Student extends Person{
+
+private String major;
+private float gpa;
+private int level;
+
+public Student(String name, String id, int age) {
+super(name,id,age);
+}
+
+public String getMajor() {
+return major;
+}
+
+public void setMajor(String major) {
+this.major = major;
+}
+
+public float getGpa() {
+return gpa;
+}
+
+public void setGpa(float gpa) {
+this.gpa = gpa;
+}
+
+public int getLevel() {
+return level;
+}
+
+public void setLevel(int level) {
+this.level = level;
+}
+
+
+}
